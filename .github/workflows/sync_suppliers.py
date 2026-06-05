@@ -99,33 +99,33 @@ def parse_offer(offer, supplier_name, supplier_label, categories_map, item_type,
     """Парсить один offer з XML і повертає dict для Supabase"""
     offer_id    = offer.get("id", "")
     available   = offer.get("available", "true").lower() == "true"
-    
+
     name        = offer.findtext("name_ua") or offer.findtext("name") or ""
     name        = re.sub(r'<[^>]+>', '', name).strip()
     vendor      = offer.findtext("vendor") or ""
     vendor_code = offer.findtext("vendorCode") or ""
-    
+
     price_raw   = offer.findtext("price")
     price       = float(price_raw) if price_raw else 0
     price_with_margin = apply_margin(price, margin) if price > 0 else 0
-    
+
     # Залишки
     qty_text    = offer.findtext("quantity_in_stock")
     stock       = int(qty_text) if qty_text and qty_text.isdigit() else (1 if available else 0)
-    
+
     # Фото
     pictures    = [p.text for p in offer.findall("picture") if p.text]
     image       = pictures[0] if pictures else ""
-    
+
     # Опис (беремо ua версію якщо є)
     desc_raw    = offer.findtext("description_ua") or offer.findtext("description") or ""
     description = clean_html(desc_raw)[:2000]  # обмежуємо до 2000 символів
-    
+
     # Категорія
     cat_id      = offer.findtext("categoryId") or ""
     category    = categories_map.get(cat_id, "")
 
-    # Стан товару (б/у визначаємо по категорії або назві)
+    # Стан товару
     condition = "used"
     name_lower = name.lower()
     desc_lower = description.lower()
@@ -135,29 +135,29 @@ def parse_offer(offer, supplier_name, supplier_label, categories_map, item_type,
         condition = "new"
 
     return {
-        "id":           f"{supplier_name}_{offer_id}",
-        "name":         name,
-        "brand":        vendor,
-        "price":        price_with_margin,
-        "old_price":    price_with_margin,  # можна пізніше додати логіку знижок
-        "stock":        stock,
-        "available":    available and stock > 0,
-        "image":        image,
-        "images":       pictures[:5],       # максимум 5 фото
-        "description":  description,
-        "condition":    condition,
-        "category":     category,
-        "vendor_code":  vendor_code,
-        "supplier":     supplier_label,     # ← ім'я постачальника для замовлень
-        "supplier_price": price,            # ← закупівельна ціна (для тебе)
-        "updated_at":   datetime.utcnow().isoformat(),
+        "id":             f"{supplier_name}_{offer_id}",
+        "name":           name,
+        "brand":          vendor,
+        "price":          price_with_margin,   # роздрібна ціна з націнкою
+        "old_price":      price,               # закупівельна ціна без націнки
+        "stock":          stock,
+        "available":      available and stock > 0,
+        "image":          image,
+        "images":         pictures[:5],
+        "description":    description,
+        "condition":      condition,
+        "category":       category,
+        "vendor_code":    vendor_code,
+        "supplier":       supplier_label,
+        "supplier_price": price,               # закупівельна ціна (дублюємо для зручності)
+        "updated_at":     datetime.utcnow().isoformat(),
     }
 
 def process_supplier(supplier):
     """Обробляє одного постачальника"""
     print(f"\n{'='*50}")
     print(f"🔄 Постачальник: {supplier['label']}")
-    
+
     root = fetch_xml(supplier["url"], supplier["label"])
     if root is None:
         return
@@ -174,7 +174,6 @@ def process_supplier(supplier):
     accessories_data = []
 
     for offer in offers:
-        available = offer.get("available", "true").lower() == "true"
         cat_id = offer.findtext("categoryId") or ""
 
         if supplier["type"] == "phones":
