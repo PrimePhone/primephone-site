@@ -27,4 +27,4 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python sync_suppliers.py
+       run: python .github/workflows/sync_suppliers.py
